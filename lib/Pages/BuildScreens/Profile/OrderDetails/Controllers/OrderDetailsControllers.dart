@@ -1,5 +1,13 @@
+
+
+
+
+
+
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:flutter_svprogresshud/flutter_svprogresshud.dart';
 import 'package:get/get.dart';
 import 'package:shopping_land_delivery/Model/Model/OrderDetails.dart';
@@ -8,124 +16,123 @@ import 'package:shopping_land_delivery/Pages/BuildScreens/Profile/OrderDetails/R
 import 'package:shopping_land_delivery/Pages/BuildScreens/Profile/OrderHistory/Controllers/OrderHistoryControllers.dart';
 
 class OrderDetailsControllers extends GetxController {
-  RxList<OrderDetailsM> orderDetails = <OrderDetailsM>[].obs;
-  late String title;
-  RxInt pageState = 1.obs;
-  late OrderModel order;
 
-  /// ✅ استقبال بيانات الطلب عند الانتقال للصفحة
-  OrderDetailsControllers() {
-    order = Get.arguments['order'];
-    title = Get.arguments['title'];
+  RxList<OrderDetailsM> orderDetails =<OrderDetailsM>[].obs;
+  late String title;
+  RxInt pageState=1.obs;
+  late OrderModel order;
+  OrderDetailsControllers()
+  {
+    order=Get.arguments['order'];
+    title=Get.arguments['title'];
   }
 
-  /// ✅ تحميل تفاصيل الطلب بناءً على ID
+  // ✅ تحميل تفاصيل الطلب بناءً على ID مع تصحيح الحالة المستلمة من السيرفر
   Future<void> display_order_by_id() async {
     try {
       pageState.value = 0;
-
-      // ✅ طباعة قيمة id قبل الإرسال
-      print("📦 Order ID being sent: ${order.id}");
-
-      // ✅ تحقق من وجود order.id
-      if (order.id == null || order.id.toString().isEmpty) {
-        pageState.value = 2;
-        Get.snackbar('❌ خطأ', '⚠️ معرف الطلب غير موجود أو غير صحيح');
-        return;
-      }
-
       OrderDetailsRepositories repositories = OrderDetailsRepositories();
 
-      // ✅ تغيير المفتاح إلى id إذا كان الخادم يتطلبه
-      bool isSuccess = await repositories.display_order_by_id(bodyData: {
-        'id': order.id.toString(),  // ✅ استخدم المفتاح الصحيح
-      });
+      if (await repositories.display_order_by_id(bodyData: {'id': order.id.toString()})) {
+        if (repositories.message.data != null) {
+          var data = json.decode(json.decode(repositories.message.data));
 
-      if (isSuccess && repositories.message.data != null) {
-        var data = json.decode(json.decode(repositories.message.data));
+          // ✅ استخراج الحالة المستلمة من السيرفر
+          String receivedStatus = data["status"].toString().toLowerCase(); // جعلها بحروف صغيرة للمقارنة
+          print("📌 الحالة المستلمة من السيرفر: $receivedStatus");
 
-        if (data['orders'] != null && data['orders'].isNotEmpty) {
+          // ✅ تصحيح الحالات الغير معروفة
+          if (receivedStatus == "paid") {
+            receivedStatus = "delivered"; // 🔥 تصحيح "Paid" إلى "processing"
+            print("! تم استلام حالة غير معروفة 'Paid', يتم تصحيحها إلى 'delivered'...");
+          }  else if (receivedStatus == "processing") {
+            receivedStatus = "processing"; // 🔥 تصحيح "Under delivery"
+            print("! تم استلام حالة غير معروفة 'processing', يتم تصحيحها إلى 'processing'...");
+          }
+          else if (receivedStatus == "under delivery") {
+            receivedStatus = "under_delivery"; // 🔥 تصحيح "Under delivery"
+            print("! تم استلام حالة غير معروفة 'Under delivery', يتم تصحيحها إلى 'under_delivery'...");
+          }
+
+          // ✅ تحديث الحالة المصححة قبل حفظ البيانات
+          data["status"] = receivedStatus;
+
+          // ✅ تحديث البيانات في التطبيق
           orderDetails.value = dataOrderDetailsMFromJson(json.encode([data]));
+          print("📌 الحالة بعد التصحيح: ${orderDetails.first.status}");
+
           pageState.value = 1;
         } else {
           pageState.value = 2;
-          Get.snackbar('⚠️ لا توجد بيانات', '🚫 لا توجد تفاصيل لهذا الطلب');
         }
       } else {
         pageState.value = 2;
-        Get.snackbar('❌ خطأ', '⚠️ فشل في تحميل تفاصيل الطلب');
       }
-    } catch (e) {
+    } catch (E) {
       pageState.value = 2;
-      Get.snackbar('❌ خطأ', '🚨 حدث خطأ أثناء تحميل تفاصيل الطلب: $e');
     }
   }
-  /// ✅ تحديث حالة الطلب (قيد التوصيل أو تم التوصيل)
-  Future<bool> updateOrderStatus(String nextStatus) async {
-    print("🔄 بدء تحديث حالة الطلب إلى: $nextStatus");
+
+
+  Future<bool> UpdateOrder() async {
+    Get.back(); // إغلاق الـ Dialog
+
+    if (Platform.isIOS) {
+      SVProgressHUD.setDefaultAnimationType(SVProgressHUDAnimationType.native);
+    }
     SVProgressHUD.setDefaultStyle(SVProgressHUDStyle.light);
-    SVProgressHUD.show();
+    SVProgressHUD.show(); // عرض مؤشر التحميل
 
-    try {
-      OrderDetailsRepositories repositories = OrderDetailsRepositories();
+    OrderDetailsRepositories repositories = OrderDetailsRepositories();
 
-      // ✅ استدعاء API لتحديث حالة الطلب
-      bool isUpdated = await repositories.updateOrder(bodyData: {
-        'id': order.id.toString(),
-        'status': nextStatus,
-      });
+    // تحديد الحالة الجديدة للطلب
+    String newStatus =
+    orderDetails.first.status != 'under_delivery' ? 'under_delivery' : 'delivered';
 
-      SVProgressHUD.dismiss();
+    bool success = await repositories.updateOrder(
+        bodyData: {'id': order.id.toString(), 'status': newStatus});
 
-      if (isUpdated) {
-        print("✅ تم تحديث حالة الطلب بنجاح إلى: $nextStatus");
-        Get.snackbar('✅ نجاح', 'تم تحديث حالة الطلب إلى $nextStatus');
+    SVProgressHUD.dismiss(); // إخفاء مؤشر التحميل
 
-        // ✅ تحديث حالة الطلب في الواجهة
-        orderDetails.first.status = nextStatus;
-        update();
-
-        // ✅ تحديث سجل الطلبات
-        try {
-          print("🔄 تحديث سجل الطلبات...");
-          OrderHistoryControllers controllers = Get.find();
-          controllers.onInit();
-        } catch (e) {
-          print("⚠️ تعذر تحديث سجل الطلبات: $e");
-          Get.snackbar('⚠️ تنبيه', 'تعذر تحديث سجل الطلبات');
-        }
-
-        // ✅ العودة إلى صفحة سجل الطلبات بعد نجاح التحديث
-        Future.delayed(const Duration(milliseconds: 500), () {
-          print("🔙 العودة إلى صفحة سجل الطلبات...");
-          Get.offAllNamed('/OrderHistory');  // العودة إلى صفحة سجل الطلبات
-        });
-
-        return true;  // ✅ نجاح العملية
-      } else {
-        print("❌ فشل في تحديث حالة الطلب");
-        Get.snackbar('❌ خطأ', 'فشل في تحديث حالة الطلب');
-        return false;
+    if (success) {
+      try {
+        OrderHistoryControllers controllers = Get.find();
+        controllers.update(); // ✅ تحديث GetX لضمان تحديث الواجهة
+      } catch (e) {
+        print("⚠️ Warning: OrderHistoryControllers not found.");
       }
-    } catch (e) {
-      SVProgressHUD.dismiss();
-      print("❌ خطأ أثناء تحديث الطلب: $e");
-      Get.snackbar('❌ خطأ', 'حدث خطأ أثناء تحديث الطلب: $e');
-      return false;
+
+      // ✅ إشعار نجاح
+      Get.snackbar(
+        'نجاح',
+        '✅ تم تحديث حالة الطلب إلى "$newStatus" بنجاح!',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+      );
+
+      return true; // ✅ العملية نجحت
+    } else {
+      // ❌ إشعار فشل
+      Get.snackbar(
+        'خطأ',
+        '⚠️ فشل في تحديث الطلب، يرجى المحاولة مرة أخرى.',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+      );
+
+      return false; // ❌ العملية فشلت
     }
   }
 
 
 
-
-
-  /// ✅ تحميل البيانات عند فتح الصفحة
   @override
   void onInit() {
+    // TODO: implement onInit
     super.onInit();
     display_order_by_id();
   }
+
 }
-
-
-

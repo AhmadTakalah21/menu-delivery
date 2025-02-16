@@ -21,6 +21,8 @@ import 'package:shopping_land_delivery/Pages/MainScreenView/Controllers/MainScre
 import 'package:shopping_land_delivery/main.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../Services/location_services/location_service_controller.dart';
+
 
 class MainScreenView extends StatefulWidget {
   const MainScreenView({super.key});
@@ -31,6 +33,8 @@ class MainScreenView extends StatefulWidget {
 
 class _MainScreenViewState extends State<MainScreenView> with WidgetsBindingObserver  {
   MainScreenViewControllers controller = Get.put(MainScreenViewControllers());
+  // إضافة تعريف للكائن
+  LocationController _locationController = Get.put(LocationController());
 
 
   @override
@@ -99,6 +103,7 @@ class _MainScreenViewState extends State<MainScreenView> with WidgetsBindingObse
                   elevation: 0,
                   backgroundColor: Colors.transparent,
                   onPressed: (){
+                    _locationController.stopLocationTracking(); // ⛔ إيقاف التتبع عند تسجيل الخروج
                     ALMethode.logout();
                   },
                   child: ShaderMask(

@@ -65,41 +65,45 @@ class OrderDetailsRepositories
       // ✅ طباعة البيانات المرسلة
       print("📤 البيانات المرسلة: $bodyData");
 
-      // ✅ التحقق من القيمة الصحيحة لحقل status
-      String correctedStatus = bodyData['status'] == 'accepted' ? 'delivered' : bodyData['status']!;
-
       // ✅ إرسال الطلب
       var response = await ALApiClient(
         methode: 'update_order',
         bodyData: {
           'id': bodyData['id']!,
-          'status': correctedStatus,  // 🔥 إصلاح قيمة status
+          'status': bodyData['status']!,
         },
       ).request(get: false);
 
       print("📥 استجابة السيرفر: $response");
 
-      if (response.runtimeType != bool) {
+      // ✅ التعامل مع استجابة السيرفر بناءً على نوعها
+      if (response is String) {
         var decodedResponse = json.decode(response);
 
-        if (decodedResponse is List && decodedResponse.isNotEmpty) {
-          var message = decodedResponse.first;
-
-          if (message['status'] == 1) {
-            print("✅ تم تحديث الطلب بنجاح.");
+        if (decodedResponse is Map && decodedResponse.containsKey('status')) {
+          if (decodedResponse['status'] == true) {
+            print("✅ تم تحديث الطلب بنجاح (استجابة Map)");
             return true;
-          } else {
-            print("❌ فشل التحديث: ${message['description']}");
-            return false;
+          }
+        } else if (decodedResponse is List && decodedResponse.isNotEmpty) {
+          var message = decodedResponse.first;
+          if (message['status'] == 1) {
+            print("✅ تم تحديث الطلب بنجاح (استجابة List)");
+            return true;
           }
         }
       }
+
+      // ❌ في حال لم تتطابق أي استجابة متوقعة
+      print("❌ استجابة غير متوقعة من السيرفر.");
       return false;
     } catch (e) {
       print("❌ خطأ أثناء تحديث الطلب: $e");
       return false;
     }
   }
+
+
 
 
 

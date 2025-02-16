@@ -33,6 +33,10 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
+  flutter_background_service: ^5.1.0
+  flutter_background_service_android: ^6.3.0
+  flutter_map: ^6.2.1
+  latlong2: ^0.9.0
   cupertino_icons: ^1.0.2
   get: ^4.6.6
   win32: ^5.10.0
@@ -75,6 +79,7 @@ dependencies:
   flutter_datetime_picker_plus:
   flutter_keyboard_visibility:
   rxdart: ^0.28.0
+  workmanager: ^0.5.2
 
 
 

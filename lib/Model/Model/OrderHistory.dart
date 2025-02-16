@@ -28,6 +28,7 @@ class OrderModel {
   String? status;
   String? total;
   int? restaurantId;
+  String? delivery_price;
   String? address;
   String? longitude;
   String? latitude;
@@ -42,6 +43,7 @@ class OrderModel {
     this.userPhone,
     this.status,
     this.total,
+    this.delivery_price,
     this.restaurantId,
     this.address,
     this.longitude,
@@ -57,6 +59,7 @@ class OrderModel {
       user: json['user'],
       userPhone: json['user_phone'],
       status: json['status'],
+      delivery_price: json['delivery_price'],
       total: json['total'],
       restaurantId: json['restaurant_id'],
       address: json['address'],

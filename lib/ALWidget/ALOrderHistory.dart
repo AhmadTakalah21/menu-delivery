@@ -90,7 +90,7 @@ class _ALOrderHistoryState extends State<ALOrderHistory> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  '${TranslationKeys.price.tr}:',
+                  '${TranslationKeys.price.tr}',
                   style: const TextStyle(
                       color: Colors.black, fontSize: 16, fontWeight: FontWeight.w400),
                 ),

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:workmanager/workmanager.dart';
 import 'location_service.dart';
 
 class LocationController extends GetxController {
@@ -7,12 +8,24 @@ class LocationController extends GetxController {
   var userPosition = Rx<Position?>(null);
   final LocationService _locationService = LocationService();
 
-  Stream<Position>? _positionStream;
-
   /// ✅ الحصول على الموقع الحالي وإرساله لمرة واحدة
   Future<void> fetchUserLocation(String userId, String token) async {
     try {
       isLoading.value = true;
+
+      // ✅ التأكد من أن المستخدم منح إذن الموقع
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          Get.snackbar("🚫 خطأ", "تم رفض إذن الموقع");
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        Get.snackbar("❌ خطأ", "تم رفض الإذن بشكل دائم");
+        return;
+      }
 
       // ✅ الحصول على الموقع الحالي
       Position position = await _locationService.getUserLocation();
@@ -34,44 +47,15 @@ class LocationController extends GetxController {
     }
   }
 
-  /// ✅ بدء تتبع الموقع بشكل مستمر وإرساله إلى السيرفر
-  void startLocationTracking(String userId, String token) {
-    if (_positionStream != null) {
-      print('🚨 التتبع مفعل مسبقًا');
-      return;
-    }
-
-    // ✅ إعداد التتبع المستمر
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,  // 🎯 دقة عالية
-        distanceFilter: 10,               // 🔄 تحديث كل 10 أمتار
-      ),
-    );
-
-    // ✅ الاستماع لتحديثات الموقع وإرسالها للسيرفر
-    _positionStream!.listen((Position position) async {
-      userPosition.value = position;
-
-      await _locationService.sendLocationToBackend(
-        userId,
-        position.latitude,
-        position.longitude,
-        token,
-      );
-
-      print('📍 الموقع الحالي: ${position.latitude}, ${position.longitude}');
-    });
-
-    Get.snackbar("✅ بدء التتبع", "يتم الآن تتبع الموقع بشكل مستمر");
+  /// ✅ بدء تتبع الموقع في الخلفية وإرساله بشكل مستمر
+  Future<void> startLocationTracking(String userId, String token) async {
+    await _locationService.registerBackgroundTracking(userId, token);
+    Get.snackbar("✅ بدء التتبع", "يتم الآن تتبع الموقع في الخلفية");
   }
 
-  /// ✅ إيقاف تتبع الموقع
-  void stopLocationTracking() {
-    if (_positionStream != null) {
-      _positionStream = null;
-      print('🛑 تم إيقاف تتبع الموقع');
-      Get.snackbar("🛑 تم الإيقاف", "تم إيقاف تتبع الموقع");
-    }
+  /// ✅ إيقاف تتبع الموقع في الخلفية
+  Future<void> stopLocationTracking() async {
+    await Workmanager().cancelAll();
+    Get.snackbar("🛑 تم الإيقاف", "تم إيقاف تتبع الموقع في الخلفية");
   }
 }
