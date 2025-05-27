@@ -1,169 +1,495 @@
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'dart:async';
 import 'dart:convert';
-import 'package:workmanager/workmanager.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-
-const String trackLocationTask = "trackLocation";
+import 'package:get/get.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class LocationService {
-  Stream<Position>? _positionStream;
-  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  static final LocationService _instance = LocationService._internal();
+  factory LocationService() => _instance;
+  LocationService._internal();
 
-  LocationService() {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
-    final InitializationSettings initializationSettings =
-    InitializationSettings(android: initializationSettingsAndroid);
-    _flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  }
+  WebSocketChannel? _mainChannel;
+  WebSocketChannel? _orderChannel;
 
-  /// ✅ إعداد WorkManager لتتبع الموقع في الخلفية
-  static void callbackDispatcher() {
-    Workmanager().executeTask((task, inputData) async {
-      if (task == trackLocationTask) {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
-          print("🚫 خدمة الموقع غير مفعلة، WorkManager لن يعمل.");
-          return Future.error('⚠️ خدمة الموقع غير مفعلة');
-        }
+  bool _subscribedMain = false;
+  bool _subscribedOrder = false;
 
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-          return Future.error('❌ لم يتم منح إذن الموقع');
-        }
+  // فتح قناة الموقع العام
+  void initMainWebSocket() {
+    if (_mainChannel != null) return;
 
-        final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.bestForNavigation);
-        final String userId = inputData?["userId"] ?? "";
-        final String token = inputData?["token"] ?? "";
-
-        if (userId.isNotEmpty && token.isNotEmpty) {
-          LocationService().sendLocationToBackend(userId, position.latitude, position.longitude, token);
-        }
-      }
-      return Future.value(true);
-    });
-  }
-
-  /// ✅ تسجيل WorkManager لبدء تتبع الموقع في الخلفية
-  Future<void> registerBackgroundTracking(String userId, String token) async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      print("🚫 خدمة الموقع غير مفعلة، لن يتم تشغيل التتبع.");
-      return;
-    }
-
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false); // ✅ تأكيد تعطيل وضع التصحيح
-    await Workmanager().registerPeriodicTask(
-      "1",
-      trackLocationTask,
-      frequency: const Duration(minutes: 15),
-      inputData: {"userId": userId, "token": token},
+    _mainChannel = WebSocketChannel.connect(
+      Uri.parse('ws://192.168.1.102:8080/app/bqfkpognxb0xxeax5bjc'),
     );
 
-    await _showNotification("📡 التتبع نشط", "يتم تتبع موقعك في الخلفية"); // ✅ التأكد من عرض الإشعار
-    print('🚀 تم تمكين التتبع في الخلفية');
+    _mainChannel?.sink.add(jsonEncode({
+      'event': 'pusher:subscribe',
+      'data': {'channel': 'locationUpdated'},
+    }));
+
+    _mainChannel?.stream.listen(
+          (message) {
+        print("📩 main: $message");
+        final decoded = jsonDecode(message);
+        if (decoded['event'] == 'pusher_internal:subscription_succeeded') {
+          _subscribedMain = true;
+          print("✅ تم الاشتراك في قناة الموقع العامة.");
+        }
+      },
+      onError: (error) {
+        print("❌ خطأ mainChannel: $error");
+        _subscribedMain = false;
+        _reconnectMain();
+      },
+      onDone: () {
+        _subscribedMain = false;
+        _reconnectMain();
+      },
+    );
   }
 
+  // قناة الطلب (ديناميكية)
+  void openOrderChannel(String orderId) {
+    if (_orderChannel != null) return;
 
-  /// ✅ الحصول على الموقع الحالي
-  Future<Position> getUserLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      print("❌ خدمة الموقع غير مفعلة، التتبع متوقف.");
-      return Future.error('⚠️ خدمة الموقع غير مفعلة');
-    }
+    final orderChannelName = 'order.$orderId';
+    _orderChannel = WebSocketChannel.connect(
+      Uri.parse('ws://192.168.1.40:8080/app/bqfkpognxb0xxeax5bjc'),
+    );
 
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        print("🚫 تم رفض إذن الموقع");
-        return Future.error('🚫 تم رفض إذن الوصول إلى الموقع');
+    _orderChannel?.sink.add(jsonEncode({
+      'event': 'pusher:subscribe',
+      'data': {'channel': orderChannelName},
+    }));
+
+    _orderChannel?.stream.listen(
+          (message) {
+        print("📩 order.$orderId: $message");
+        final decoded = jsonDecode(message);
+        if (decoded['event'] == 'pusher_internal:subscription_succeeded') {
+          _subscribedOrder = true;
+          print("✅ تم الاشتراك في order.$orderId");
+        }
+      },
+      onError: (error) {
+        print("❌ خطأ orderChannel: $error");
+        _subscribedOrder = false;
+        _reconnectOrder(orderId);
+      },
+      onDone: () {
+        _subscribedOrder = false;
+        _reconnectOrder(orderId);
+      },
+    );
+  }
+
+  void _reconnectMain() {
+    _mainChannel = null;
+    Future.delayed(Duration(seconds: 3), initMainWebSocket);
+  }
+
+  void _reconnectOrder(String orderId) {
+    _orderChannel = null;
+    Future.delayed(Duration(seconds: 3), () => openOrderChannel(orderId));
+  }
+
+  // إرسال للموقع إلى كلا القناتين
+  Future<void> sendLocationToBackendViaWebSocket(
+      double latitude,
+      double longitude,
+      String token,
+      String userId,
+      String? orderId,
+      ) async {
+    final payload = {
+      'latitude': latitude.toStringAsFixed(6),
+      'longitude': longitude.toStringAsFixed(6),
+      'userId': userId,
+    };
+
+    // إرسال إلى القناة العامة
+    if (_subscribedMain && _mainChannel != null) {
+      try {
+        _mainChannel?.sink.add(jsonEncode({
+          'event': 'client-locationUpdated',
+          'data': payload,
+          'channel': 'locationUpdated',
+        }));
+      } catch (e) {
+        print("⚠️ فشل إرسال الموقع للقناة العامة: $e");
       }
     }
-    if (permission == LocationPermission.deniedForever) {
-      print("❌ تم رفض إذن الموقع بشكل دائم");
-      return Future.error('❌ تم رفض الإذن بشكل دائم');
-    }
 
-    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.bestForNavigation);
+    // إرسال إلى قناة الطلب
+    if (orderId != null && _subscribedOrder && _orderChannel != null) {
+      try {
+        _orderChannel?.sink.add(jsonEncode({
+          'event': 'client-locationUpdated',
+          'data': payload,
+          'channel': 'order.$orderId',
+        }));
+      } catch (e) {
+        print("⚠️ فشل إرسال الموقع لقناة الطلب: $e");
+      }
+    }
   }
 
-  /// ✅ تتبع الموقع بشكل مباشر عند فتح التطبيق
-  Future<void> startLocationTracking(String userId, String token) async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      print("🚫 خدمة الموقع غير مفعلة، لن يتم تشغيل التتبع.");
-      return;
+  // إغلاق الاتصالات
+  void closeAllConnections() {
+    try {
+      _mainChannel?.sink.close();
+      _orderChannel?.sink.close();
+      _mainChannel = null;
+      _orderChannel = null;
+      _subscribedMain = false;
+      _subscribedOrder = false;
+      print("🔌 تم إغلاق جميع WebSocket.");
+    } catch (e) {
+      print("⚠️ خطأ أثناء الإغلاق: $e");
     }
+  }
 
-    if (_positionStream != null) {
-      print('🚨 التتبع مفعل مسبقًا');
-      return;
+  void closeOrderChannel() {
+    try {
+      _orderChannel?.sink.close();
+      _orderChannel = null;
+      _subscribedOrder = false;
+      print("🛑 تم إغلاق قناة الطلب.");
+    } catch (e) {
+      print("⚠️ خطأ أثناء إغلاق قناة الطلب: $e");
     }
+  }
+}
+
+
+class LocationController extends GetxController {
+  var isLoading = false.obs;
+  var userPosition = Rx<Position?>(null);
+  StreamSubscription<Position>? _positionStream;
+  final LocationService _locationService = LocationService();
+
+  // إرسال الموقع الحالي لمرة واحدة
+  Future<void> fetchUserLocationAndSend(String token, String userId,{String? orderId}) async {
+    try {
+      isLoading.value = true;
+
+      // تحقق من الأذونات
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          Get.snackbar("🚫 خطأ", "تم رفض إذن الموقع");
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        Get.snackbar("❌ خطأ", "تم رفض الإذن بشكل دائم");
+        return;
+      }
+
+      // الحصول على الموقع
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.bestForNavigation,
+      );
+      userPosition.value = position;
+
+      // إرسال الموقع
+      await _locationService.sendLocationToBackendViaWebSocket(
+        position.latitude,
+        position.longitude,
+        token,
+        userId,
+        orderId,
+
+      );
+
+      Get.snackbar(" نجاح", "تم إرسال الموقع الحالي.");
+    } catch (e) {
+      Get.snackbar(" خطأ", "فشل في تحديد الموقع: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // بدء تتبع تغيّر الموقع وإرساله تلقائيًا
+  void startListeningToLocationChanges(String token, String userId, {String? orderId}) {
+    stopListeningToLocationChanges();
 
     _positionStream = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 1,
-        // إزالة timeInterval
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
       ),
-    );
+    ).listen((Position position) {
+      userPosition.value = position;
 
-    _positionStream!.listen((Position position) {
-      print('📡 موقع جديد: ${position.latitude}, ${position.longitude}');
-      sendLocationToBackend(userId, position.latitude, position.longitude, token);
+      _locationService.sendLocationToBackendViaWebSocket(
+        position.latitude,
+        position.longitude,
+        token,
+        userId,
+        orderId,
+      );
     });
 
+    print("📍 بدأ تتبع الموقع وإرساله${orderId != null ? " إلى قناة order.$orderId" : ""}.");
   }
 
-  /// ✅ إرسال الموقع إلى الـ Backend
-  Future<void> sendLocationToBackend(String userId, double latitude, double longitude, String token) async {
-    final url = Uri.parse('https://menuback.le.sy/delivery_api/location_tracking');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
-        body: jsonEncode({'id': userId, 'latitude': latitude.toStringAsFixed(6), 'longitude': longitude.toStringAsFixed(6)}),
-      );
-      if (response.statusCode == 200) {
-        print('✅ تم إرسال الموقع بنجاح');
-      } else {
-        print('❌ فشل إرسال الموقع: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('⚠️ حدث خطأ أثناء إرسال الموقع: $e');
-    }
+
+  // إيقاف التتبع
+  void stopListeningToLocationChanges() {
+    _positionStream?.cancel();
+    _positionStream = null;
+    print("🛑 تم إيقاف تتبع الموقع.");
   }
 
-  /// ✅ إيقاف تتبع الموقع فقط عند تسجيل الخروج
-  void stopLocationTracking() {
-    if (_positionStream != null) {
-      _positionStream = null;
-      print('🛑 تم إيقاف تتبع الموقع');
-    }
-    Workmanager().cancelAll();
-    _showNotification("🛑 تم إيقاف التتبع", "تم إيقاف تتبع موقعك بعد تسجيل الخروج.");
-  }
 
-  /// ✅ إرسال إشعار للمستخدم عند بدء التتبع في الخلفية
-  Future<void> _showNotification(String title, String body) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-    AndroidNotificationDetails(
-      'location_tracking_channel',
-      'تتبع الموقع',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: false,
-    );
-    const NotificationDetails platformChannelSpecifics =
-    NotificationDetails(android: androidPlatformChannelSpecifics);
-    await _flutterLocalNotificationsPlugin.show(
-      0,
-      title,
-      body,
-      platformChannelSpecifics,
-    );
+  @override
+  void onClose() {
+    stopListeningToLocationChanges();
+    super.onClose();
   }
 }
+
+
+
+
+
+
+
+//befor
+// import 'dart:async';
+// import 'dart:convert';
+// import 'dart:io';
+//
+// import 'package:android_intent_plus/android_intent.dart';
+// import 'package:android_intent_plus/flag.dart';
+// import 'package:flutter_background_service/flutter_background_service.dart';
+// import 'package:geolocator/geolocator.dart';
+// import 'package:get/get.dart';
+// import 'package:permission_handler/permission_handler.dart';
+// import 'package:device_info_plus/device_info_plus.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+// import 'package:web_socket_channel/web_socket_channel.dart';
+//
+// import '../../main.dart';
+//
+// const String trackLocationTask = "trackLocation";
+//
+// class LocationService {
+//   static final LocationService _instance = LocationService._internal();
+//   factory LocationService() => _instance;
+//   LocationService._internal() {
+//     initWebSocket();
+//   }
+//
+//   WebSocketChannel? _channel;
+//   StreamSubscription<Position>? _positionStream;
+//   bool _subscribed = false;
+//
+//   // ✅ دالة فتح إعدادات البطارية لتجاوز تحسين البطارية
+//   Future<void> openBatteryOptimizationSettings() async {
+//     try {
+//       final intent = AndroidIntent(
+//         action: 'android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+//         package: 'com.android.settings',
+//         flags: <int>[Flag.FLAG_ACTIVITY_NEW_TASK],
+//       );
+//       await intent.launch();
+//     } catch (e) {
+//       print("❌ فشل في فتح إعدادات تحسين البطارية: $e");
+//     }
+//   }
+//
+//   static Future<void> initializeForegroundService() async {
+//     final service = FlutterBackgroundService();
+//
+//     if (await DeviceInfoPlugin().androidInfo.then((info) => info.version.sdkInt >= 33)) {
+//       PermissionStatus status = await Permission.location.request();
+//       if (!status.isGranted) {
+//         print("🚫 إذن الموقع مرفوض، لن يعمل التتبع.");
+//         return;
+//       }
+//     }
+//
+//     // فتح إعدادات البطارية لتجاوز تحسين البطارية
+//     await LocationService().openBatteryOptimizationSettings();
+//
+//     await service.configure(
+//       androidConfiguration: AndroidConfiguration(
+//         onStart: onStart,
+//         autoStart: true,
+//         isForegroundMode: true,
+//         notificationChannelId: 'tracking_service',
+//         initialNotificationTitle: '📡 التتبع نشط',
+//         initialNotificationContent: 'يتم تتبع موقعك في الخلفية.',
+//         foregroundServiceNotificationId: 888,
+//       ),
+//       iosConfiguration: IosConfiguration(
+//         onForeground: onStart,
+//         autoStart: true,
+//       ),
+//     );
+//
+//     service.startService();
+//   }
+//
+//   static void onStart(ServiceInstance service) async {
+//     if (service is AndroidServiceInstance) {
+//       service.setForegroundNotificationInfo(
+//         title: '📡 التتبع نشط',
+//         content: 'يتم تتبع موقعك في الخلفية.',
+//       );
+//     }
+//
+//     SharedPreferences prefs = await SharedPreferences.getInstance();
+//     final String token = prefs.getString('token') ?? "TOKEN";
+//     if (token == "TOKEN") {
+//       print('❌ فشل: التوكن غير موجود.');
+//       return;
+//     }
+//
+//     final locationService = LocationService();
+//
+//     Geolocator.getPositionStream(
+//       locationSettings: const LocationSettings(
+//         accuracy: LocationAccuracy.bestForNavigation,
+//         distanceFilter: 10,
+//       ),
+//     ).listen((Position position) {
+//       String userId = alSettings.currentUser?.userId ?? "defaultUserId";
+//       print('📡 موقع جديد: ${position.latitude}, ${position.longitude}');
+//       locationService.sendLocationToBackendViaWebSocket(userId, position.latitude, position.longitude, token);
+//     });
+//   }
+//
+//   Future<Position> getUserLocation() async {
+//     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+//     if (!serviceEnabled) {
+//       print("❌ خدمة الموقع غير مفعلة.");
+//       return Future.error('⚠️ خدمة الموقع غير مفعلة');
+//     }
+//
+//     LocationPermission permission = await Geolocator.checkPermission();
+//     if (permission == LocationPermission.denied) {
+//       permission = await Geolocator.requestPermission();
+//       if (permission == LocationPermission.denied) {
+//         return Future.error('🚫 تم رفض الإذن');
+//       }
+//     }
+//     if (permission == LocationPermission.deniedForever) {
+//       return Future.error('❌ تم رفض الإذن بشكل دائم');
+//     }
+//
+//     return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.bestForNavigation);
+//   }
+//
+//   Future<void> sendLocationToBackendViaWebSocket(
+//       String userId, double latitude, double longitude, String token) async {
+//     if (token.isEmpty) {
+//       print("❌ التوكن غير صالح.");
+//       return;
+//     }
+//
+//     if (!_subscribed) {
+//       print("🚫 لم يتم الاشتراك في القناة بعد. سيتم تجاهل الإرسال.");
+//       return;
+//     }
+//
+//     try {
+//       if (_channel != null) {
+//         final locationUpdated = jsonEncode({
+//           'event': 'client-locationUpdated',
+//           'data': {
+//             'latitude': latitude.toStringAsFixed(6),
+//             'longitude': longitude.toStringAsFixed(6),
+//           },
+//           'channel': 'locationUpdated',
+//         });
+//
+//         print("📡 إرسال الموقع: $locationUpdated");
+//         _channel?.sink.add(locationUpdated);
+//         print("✅ تم الإرسال.");
+//       } else {
+//         print("❌ WebSocket غير متصل.");
+//       }
+//     } catch (e) {
+//       print("⚠️ خطأ أثناء إرسال الموقع: $e");
+//     }
+//   }
+//
+//   void stopLocationUpdates() async {
+//     final service = FlutterBackgroundService();
+//     service.invoke('stopService');
+//
+//     SharedPreferences prefs = await SharedPreferences.getInstance();
+//     await prefs.remove('token');
+//     print("🛑 تم حذف التوكن.");
+//
+//     _positionStream?.cancel();
+//     _channel?.sink.close();
+//     print("🛑 تم إيقاف التتبع والاتصال.");
+//   }
+//
+//   void initWebSocket() {
+//     if (_channel != null) return;
+//
+//     _channel = WebSocketChannel.connect(
+//       Uri.parse('ws://192.168.1.40:8080/app/bqfkpognxb0xxeax5bjc'),
+//     );
+//
+//     _channel?.sink.add(jsonEncode({
+//       'event': 'pusher:subscribe',
+//       'data': {
+//         'channel': 'locationUpdated',
+//       }
+//     }));
+//
+//     _channel?.stream.listen(
+//           (message) {
+//         print("📩 الرسالة الواردة: $message");
+//
+//         try {
+//           final decoded = jsonDecode(message);
+//           if (decoded['event'] == 'pusher_internal:subscription_succeeded') {
+//             _subscribed = true;
+//             print("✅ تم الاشتراك بنجاح في القناة.");
+//           }
+//         } catch (e) {
+//           print("⚠️ خطأ في تحليل الرسالة: $e");
+//         }
+//       },
+//       onError: (error) {
+//         print("❌ خطأ WebSocket: $error");
+//         _reconnect();
+//       },
+//       onDone: () {
+//         print("🔌 تم قطع الاتصال.");
+//         _subscribed = false;
+//         _reconnect();
+//       },
+//     );
+//   }
+//
+//   void _reconnect() {
+//     print("🔁 إعادة الاتصال بعد 3 ثوانٍ...");
+//     _channel = null;
+//     _subscribed = false;
+//     Future.delayed(Duration(seconds: 3), () {
+//       initWebSocket();
+//     });
+//   }
+//
+//   void startLocationUpdates(String userId, String token) {
+//     _positionStream = Geolocator.getPositionStream(
+//       locationSettings: const LocationSettings(
+//         accuracy: LocationAccuracy.bestForNavigation,
+//         distanceFilter: 10,
+//       ),
+//     ).listen((Position position) {
+//       print('📡 الموقع الحالي: ${position.latitude}, ${position.longitude}');
+//       sendLocationToBackendViaWebSocket(userId, position.latitude, position.longitude, token);
+//     });
+//   }
+// }

@@ -112,12 +112,18 @@ class _ALOrderHistoryState extends State<ALOrderHistory> {
                   style: const TextStyle(
                       color: Colors.black, fontSize: 16, fontWeight: FontWeight.w400),
                 ),
-                Text(
-                  widget.orderHistoryM.address ?? 'غير متوفر',
-                  style: const TextStyle(
-                      color: Colors.black, fontSize: 16, fontWeight: FontWeight.w400),
+                SizedBox(width: Get.width * 0.02),  // Add a small space between the label and value
+                Expanded(
+                  child: Text(
+                    widget.orderHistoryM.address ?? 'غير متوفر',
+                    style: const TextStyle(
+                        color: Colors.black, fontSize: 16, fontWeight: FontWeight.w400),
+                    maxLines: 2, // Limit to 2 lines
+                    overflow: TextOverflow.ellipsis, // Show ellipsis if the text overflows
+                  ),
                 ),
               ],
+
             ),
             SizedBox(height: 10),
 

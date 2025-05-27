@@ -33,8 +33,7 @@ class MainScreenView extends StatefulWidget {
 
 class _MainScreenViewState extends State<MainScreenView> with WidgetsBindingObserver  {
   MainScreenViewControllers controller = Get.put(MainScreenViewControllers());
-  // إضافة تعريف للكائن
-  LocationController _locationController = Get.put(LocationController());
+
 
 
   @override
@@ -103,7 +102,7 @@ class _MainScreenViewState extends State<MainScreenView> with WidgetsBindingObse
                   elevation: 0,
                   backgroundColor: Colors.transparent,
                   onPressed: (){
-                    _locationController.stopLocationTracking(); // ⛔ إيقاف التتبع عند تسجيل الخروج
+                    // _locationController.stopLocationTracking(); // ⛔ إيقاف التتبع عند تسجيل الخروج
                     ALMethode.logout();
                   },
                   child: ShaderMask(

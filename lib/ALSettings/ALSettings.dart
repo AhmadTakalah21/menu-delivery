@@ -58,29 +58,33 @@ class ALSettings extends GetxController with WidgetsBindingObserver
 
 
   Future<void> getUserInfo() async {
-
     List<String>? session = await ALMethode.getSharedPreferencesWithType(kay: 'session', type: SharedPreferencesType.listString);
     String? local = await ALMethode.getSharedPreferencesWithType(kay: 'locale', type: SharedPreferencesType.string);
 
-    if(session!=null) {
-      currentUser= CurrentUser(
-              userId:session[0],
-              email:session[1],
-              password:session[2],
-              fullName:session[3],
-              apiKey:session[4],
-              fcmToken:session[5],
-              image:session[6],
-             locale:local??session[7],
-              userName:session[8],
+    if(session != null && session.isNotEmpty) {
+      currentUser = CurrentUser(
+        userId: session[0],
+        email: session[1],
+        password: session[2],
+        fullName: session[3],
+        apiKey: session[4],
+        fcmToken: session[5],
+        image: session[6],
+        locale: local ?? session[7],
+        userName: session[8],
+      );
 
-          );
-      if( session.length>9)
-        {
-          currentUser!.citiesId=session[9];
-        }
+      // إذا كانت هناك قيمة إضافية للمدن
+      if (session.length > 9) {
+        currentUser!.citiesId = session[9];
+      }
+
+      // طباعة للتحقق
+      print("📡 userId: ${currentUser!.userId}");
+      print("📡 token: ${currentUser!.apiKey}");
     }
   }
+
 
   @override
   void onInit() async {

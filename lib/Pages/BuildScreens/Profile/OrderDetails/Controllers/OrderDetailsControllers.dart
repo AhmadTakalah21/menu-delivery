@@ -15,6 +15,10 @@ import 'package:shopping_land_delivery/Model/Model/OrderHistory.dart';
 import 'package:shopping_land_delivery/Pages/BuildScreens/Profile/OrderDetails/Repositories/OrderDetailsRepositories.dart';
 import 'package:shopping_land_delivery/Pages/BuildScreens/Profile/OrderHistory/Controllers/OrderHistoryControllers.dart';
 
+import '../../../../../ALConstants/ALMethode.dart';
+import '../../../../../Services/location_services/location_service.dart';
+import '../../../../../main.dart';
+
 class OrderDetailsControllers extends GetxController {
 
   RxList<OrderDetailsM> orderDetails =<OrderDetailsM>[].obs;
@@ -75,6 +79,9 @@ class OrderDetailsControllers extends GetxController {
 
 
   Future<bool> UpdateOrder() async {
+    await ALMethode.setUserInfo(data: alSettings.currentUser!);
+    String userId = alSettings.currentUser!.userId!;
+    String token = alSettings.currentUser!.apiKey!;
     Get.back(); // إغلاق الـ Dialog
 
     if (Platform.isIOS) {
@@ -86,34 +93,56 @@ class OrderDetailsControllers extends GetxController {
     OrderDetailsRepositories repositories = OrderDetailsRepositories();
 
     // تحديد الحالة الجديدة للطلب
-    String newStatus =
-    orderDetails.first.status != 'under_delivery' ? 'under_delivery' : 'delivered';
+    String newStatus = orderDetails.first.status != 'under_delivery'
+        ? 'under_delivery'
+        : 'delivered';
+
+    final orderId = order.id?.toString();
+    if (orderId == null) {
+      SVProgressHUD.dismiss();
+      Get.snackbar('خطأ', 'رقم الطلب غير موجود');
+      return false;
+    }
 
     bool success = await repositories.updateOrder(
-        bodyData: {'id': order.id.toString(), 'status': newStatus});
+      bodyData: {'id': orderId, 'status': newStatus},
+    );
 
     SVProgressHUD.dismiss(); // إخفاء مؤشر التحميل
 
     if (success) {
       try {
         OrderHistoryControllers controllers = Get.find();
-        controllers.update(); // ✅ تحديث GetX لضمان تحديث الواجهة
+        controllers.update(); // تحديث GetX
       } catch (e) {
         print("⚠️ Warning: OrderHistoryControllers not found.");
       }
 
-      // ✅ إشعار نجاح
+      // الاشتراك أو الإلغاء حسب الحالة
+      final locationService = LocationService();
+      if (newStatus == 'under_delivery') {
+        locationService.openOrderChannel(orderId);
+
+        // ✅ تشغيل تتبع الموقع
+        LocationController locationController = Get.put(LocationController());
+        locationController.startListeningToLocationChanges(token, userId, orderId: orderId);
+      } else if (newStatus == 'delivered') {
+        locationService.closeOrderChannel();
+
+        // ✅ إيقاف التتبع
+        LocationController locationController = Get.put(LocationController());
+        locationController.stopListeningToLocationChanges();
+      }
+
       Get.snackbar(
         'نجاح',
-        '✅ تم تحديث حالة الطلب إلى "$newStatus" بنجاح!',
+        'تم تحديث حالة الطلب إلى "$newStatus" بنجاح!',
         backgroundColor: Colors.green,
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
       );
-
-      return true; // ✅ العملية نجحت
+      return true;
     } else {
-      // ❌ إشعار فشل
       Get.snackbar(
         'خطأ',
         '⚠️ فشل في تحديث الطلب، يرجى المحاولة مرة أخرى.',
@@ -121,10 +150,11 @@ class OrderDetailsControllers extends GetxController {
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
       );
-
-      return false; // ❌ العملية فشلت
+      return false;
     }
   }
+
+
 
 
 

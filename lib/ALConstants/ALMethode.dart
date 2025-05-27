@@ -35,6 +35,8 @@ import 'package:shopping_land_delivery/Services/helper/status_bar.dart';
 import 'package:shopping_land_delivery/main.dart';
 import 'package:uuid/uuid.dart';
 
+import '../Services/location_services/location_service.dart';
+
 
 
 enum SharedPreferencesType {
@@ -308,25 +310,50 @@ class ALMethode {
     return 'token ${alSettings.currentUser!.apiKey}';
   }
 
-  static Future<void> logout ({bool? message,String? messageT}) async {
-    await deleteUserInfo ();
-     // FirebaseMessaging.instance.deleteToken();
-    FlutterStatusbarcolor.setNavigationBarColor(const Color(0xFFF7F7F7));
-    FlutterStatusbarcolor.setStatusBarColor(const Color(0xFFF7F7F7));
-  await Get.offAll(WelcomePage());
-  Get.deleteAll(force: true);
-  if(message!=null)
-    {
-      ALConstantsWidget.showDialogIosOrAndroid(
-          content: messageT.toString(),
-          onPressOKButton: ()async{},
-          towButton: false);
-    }
-  alSettings.onInit();
-    // Get.deleteAll(force: true);
-    // clSettings.onInit();
+  static Future<void> logout({bool? message, String? messageT}) async {
+    try {
+      // 1. إيقاف تتبع الموقع
+      final locationController = Get.isRegistered<LocationController>()
+          ? Get.find<LocationController>()
+          : null;
+      locationController?.stopListeningToLocationChanges();
 
+      // 2. إغلاق WebSocket
+      LocationService().closeAllConnections();
+
+      // 3. حذف بيانات المستخدم
+      await deleteUserInfo();
+
+      // 4. حذف FCM Token (اختياري)
+      // await FirebaseMessaging.instance.deleteToken();
+
+      // 5. إعادة تهيئة الألوان
+      FlutterStatusbarcolor.setNavigationBarColor(const Color(0xFFF7F7F7));
+      FlutterStatusbarcolor.setStatusBarColor(const Color(0xFFF7F7F7));
+
+      // 6. التوجيه
+      await Get.offAll(WelcomePage());
+
+      // 7. حذف جميع Controllers
+      Get.deleteAll(force: true);
+
+      // 8. إظهار رسالة (اختياري)
+      if (message != null) {
+        ALConstantsWidget.showDialogIosOrAndroid(
+          content: messageT.toString(),
+          onPressOKButton: () async {},
+          towButton: false,
+        );
+      }
+
+      // 9. إعادة تهيئة الإعدادات
+      alSettings.onInit();
+
+    } catch (e) {
+      print("⚠️ خطأ أثناء تسجيل الخروج: $e");
+    }
   }
+
 
 
   static Future<void> deleteUserInfo() async {

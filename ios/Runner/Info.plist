@@ -16,6 +16,9 @@
     <string>نحتاج إلى موقعك حتى يعمل التطبيق في الخلفية.</string>
     <key>NSLocalNotificationUsageDescription</key>
     <string>نحتاج إلى إرسال إشعارات محلية لإعلامك بالتحديثات المهمة.</string>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>نحتاج إلى الوصول إلى Bluetooth لتتبع الموقع باستخدام أجهزة Bluetooth.</string>
+
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>

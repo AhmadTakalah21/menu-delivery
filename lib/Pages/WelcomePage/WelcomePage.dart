@@ -99,7 +99,7 @@ class _WelcomePageState extends State<WelcomePage>   with TickerProviderStateMix
                               animationDuration: const Duration(milliseconds: 1000),
                               curve: Curves.fastLinearToSlowEaseIn,
                               offset: 5,
-                              child: Text('Menu_Delivery',style: TextStyle(fontSize: 24,fontWeight: FontWeight.w600)),
+                              child: Text('Menu_Delivery',style: TextStyle(fontSize: 24,fontWeight: FontWeight.w600,color:AppColors.whiteColor)),
                             ),
                             SizedBox(height: Get.height*0.01,),
                             SLTextAnimation(
@@ -107,7 +107,7 @@ class _WelcomePageState extends State<WelcomePage>   with TickerProviderStateMix
                               animationDuration: const Duration(milliseconds: 1000),
                               curve: Curves.fastLinearToSlowEaseIn,
                               offset: 5,
-                              child: Text('online delivery',style: TextStyle(fontSize: 13,fontWeight: FontWeight.w100)),
+                              child: Text('online delivery',style: TextStyle(fontSize: 13,fontWeight: FontWeight.w100,color:AppColors.whiteColor)),
                             ),
                           ],),
 
@@ -129,8 +129,8 @@ class _WelcomePageState extends State<WelcomePage>   with TickerProviderStateMix
                                               child: SingleChildScrollView(child: Column(children: [
                                                 ALConstantsWidget.elevatedButtonWithStyle(
                                                     text: TranslationKeys.signIn.tr,
-                                                    colors: AppColors.whiteColor,
-                                                    textColor: AppColors.basicColor,
+                                                    colors: AppColors.basicColor,
+                                                    textColor: AppColors.secondaryColor3,
                                                     onTap: (){
                                                       Get.toNamed(Routes.SingIn);
                                                     }

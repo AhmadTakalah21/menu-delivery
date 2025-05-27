@@ -26,14 +26,16 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
+        statusBarIconBrightness: Brightness.light,  // يمكن أن تظل هذه كما هي إذا كنت تستخدم لونًا فاتحًا للأيقونات
+        systemNavigationBarIconBrightness: Brightness.light, // نفس الشيء هنا
+        statusBarColor: AppColors.basicColor, // تحديد اللون الأساسي لشريط الحالة
+        systemNavigationBarColor: AppColors.basicColor, // تحديد اللون الأساسي لشريط التنقل
+
       ),
       child: Scaffold(
         backgroundColor: Color(0xFFF5F5F5),
         appBar: AppBar(
-          backgroundColor: Color(0xFF4A90E2),
+          backgroundColor:AppColors.basicColor,
           elevation: 4,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18),
@@ -236,19 +238,35 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.start,  // محاذاة النص من اليسار
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF4A90E2))),
-          Row(
-            children: [
-              Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: Colors.black87)),
-              if (trailing != null) trailing,
-            ],
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF4A90E2),
+            ),
           ),
+          const SizedBox(width: 8),  // إضافة مسافة بين العنوان والقيمة
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: Colors.black87,
+              ),
+              overflow: TextOverflow.ellipsis,  // تقطيع النص في حال كان طويلًا
+              maxLines: 2,  // يسمح بعرض النص في سطرين
+            ),
+          ),
+          if (trailing != null) trailing,  // إذا كان هناك trailing يتم إضافته
         ],
       ),
     );
   }
+
 }
 
 class MapScreen extends StatelessWidget {

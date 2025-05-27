@@ -22,11 +22,12 @@ import 'package:shopping_land_delivery/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ✅ استيراد LocationController بشكل صحيح
+import '../../../Services/location_services/location_service.dart';
 import '../../../Services/location_services/location_service_controller.dart';
 
 class SingInControllers extends GetxController with GetSingleTickerProviderStateMixin {
   // ✅ تعريف LocationController كمتحول عام ليستدعى في أي مكان داخل الكلاس
-  final LocationController _locationController = Get.put(LocationController());
+  // final LocationController _locationController = Get.put(LocationController());
 
   late Rx<AnimationController> controller;
   late Rx<Animation<double>> animation;
@@ -88,9 +89,6 @@ class SingInControllers extends GetxController with GetSingleTickerProviderState
     update();
   }
 
-  // ✅ تعديل الدالة لتستدعي الموقع بشكل صحيح بعد تسجيل الدخول
-  // ✅ تسجيل الدخول وتفعيل تتبع الموقع المستمر
-  // ✅ تسجيل الدخول وتفعيل تتبع الموقع المستمر
   void onPressedIconWithText() async {
     SingInRepositories repositories = SingInRepositories();
     try {
@@ -98,56 +96,13 @@ class SingInControllers extends GetxController with GetSingleTickerProviderState
       if (states!.validate()) {
         await SystemChannels.textInput.invokeMethod('TextInput.hide');
 
-        // ✅ التحقق من تفعيل خدمة الموقع قبل السماح بتسجيل الدخول
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
-          btnController.error(); // ⛔ تحديث حالة الزر إلى خطأ
-          ALMethode.showToast(
-            title: "❌ خطأ",
-            message: "يجب تفعيل خدمة الموقع للمتابعة",
-            type: ToastType.error,
-            context: Get.context!,
-          );
-          Timer(const Duration(seconds: 1), () {
-            btnController.reset();
-          });
-          return;
-        }
+        // ✅ متابعة عملية تسجيل الدخول
+        bool loginSuccess = await repositories.login(
+          email: email.text.trim(),
+          password: password.text.trim(),
+        );
 
-        // ✅ التحقق من إذن الوصول إلى الموقع
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
-          if (permission == LocationPermission.denied) {
-            btnController.error(); // ⛔ تحديث حالة الزر إلى خطأ
-            ALMethode.showToast(
-              title: "🚫 خطأ",
-              message: "تم رفض إذن الموقع، يرجى السماح به للمتابعة",
-              type: ToastType.error,
-              context: Get.context!,
-            );
-            Timer(const Duration(seconds: 1), () {
-              btnController.reset();
-            });
-            return;
-          }
-        }
-        if (permission == LocationPermission.deniedForever) {
-          btnController.error(); // ⛔ تحديث حالة الزر إلى خطأ
-          ALMethode.showToast(
-            title: "❌ خطأ",
-            message: "تم رفض إذن الموقع بشكل دائم، قم بتفعيله من الإعدادات",
-            type: ToastType.error,
-            context: Get.context!,
-          );
-          Timer(const Duration(seconds: 1), () {
-            btnController.reset();
-          });
-          return;
-        }
-
-        // ✅ متابعة عملية تسجيل الدخول بعد التحقق من الموقع
-        if (await repositories.login(email: email.text.trim(), password: password.text.trim())) {
+        if (loginSuccess) {
           var data = json.decode(json.decode(repositories.message.data));
 
           // ✅ حفظ بيانات المستخدم
@@ -162,11 +117,66 @@ class SingInControllers extends GetxController with GetSingleTickerProviderState
           String userId = alSettings.currentUser!.userId!;
           String token = alSettings.currentUser!.apiKey!;
 
-          // ✅ حفظ البيانات
           await saveUserData(userId, token);
 
-          // ✅ بدء التتبع بعد الحفظ في الخلفية فقط إذا كانت خدمة الموقع مفعلة
-          await _locationController.startLocationTracking(userId, token);
+          // ✅ التحقق من تفعيل خدمة الموقع بعد تسجيل الدخول
+          bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+          if (!serviceEnabled) {
+            btnController.error();
+            ALMethode.showToast(
+              title: "❌ خطأ",
+              message: "يجب تفعيل خدمة الموقع للمتابعة",
+              type: ToastType.error,
+              context: Get.context!,
+            );
+            Timer(const Duration(seconds: 1), () {
+              btnController.reset();
+            });
+            return;
+          }
+
+          // ✅ التحقق من إذن الوصول إلى الموقع
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+            if (permission == LocationPermission.denied) {
+              btnController.error();
+              ALMethode.showToast(
+                title: "🚫 خطأ",
+                message: "تم رفض إذن الموقع، يرجى السماح به للمتابعة",
+                type: ToastType.error,
+                context: Get.context!,
+              );
+              Timer(const Duration(seconds: 1), () {
+                btnController.reset();
+              });
+              return;
+            }
+          }
+
+          if (permission == LocationPermission.deniedForever) {
+            btnController.error();
+            ALMethode.showToast(
+              title: "❌ خطأ",
+              message: "تم رفض إذن الموقع بشكل دائم، قم بتفعيله من الإعدادات",
+              type: ToastType.error,
+              context: Get.context!,
+            );
+            Timer(const Duration(seconds: 1), () {
+              btnController.reset();
+            });
+            return;
+          }
+
+          final locationController = Get.put(LocationController());
+          locationController.fetchUserLocationAndSend(token, userId);
+          locationController.startListeningToLocationChanges(token, userId);
+
+
+
+          // ✅ فتح WebSocket بعد تسجيل الدخول
+          LocationService locationService = LocationService();
+          locationService.initMainWebSocket();
 
           btnController.success();
           Timer(const Duration(seconds: 1), () {
@@ -178,7 +188,7 @@ class SingInControllers extends GetxController with GetSingleTickerProviderState
             title: TranslationKeys.somethingWentWrong.tr,
             message: repositories.message.description ?? TranslationKeys.errorEmail.tr,
             type: ToastType.error,
-            context: context!,
+            context: Get.context!,
           );
           Timer(const Duration(seconds: 1), () {
             btnController.reset();
@@ -205,14 +215,19 @@ class SingInControllers extends GetxController with GetSingleTickerProviderState
 
 
 
-  /// ✅ حفظ بيانات المستخدم في SharedPreferences
+
+
+
+
+
+
   Future<void> saveUserData(String userId, String token) async {
     try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('userId', userId);
-      await prefs.setString('token', token);
+      await prefs.setString('token', token); // تأكد من تخزين التوكن الجديد
 
-      // ✅ التحقق من الحفظ
+      // التحقق من الحفظ
       String? savedUserId = prefs.getString('userId');
       String? savedToken = prefs.getString('token');
 
@@ -225,6 +240,10 @@ class SingInControllers extends GetxController with GetSingleTickerProviderState
       print('⚠️ خطأ أثناء حفظ بيانات المستخدم: $e');
     }
   }
+
+
+
+
 
 
 

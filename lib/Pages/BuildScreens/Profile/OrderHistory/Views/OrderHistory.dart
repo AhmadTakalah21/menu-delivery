@@ -48,11 +48,14 @@ class _OrderHistoryState extends State<OrderHistory> {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
-            statusBarIconBrightness: Brightness.light,
-            systemNavigationBarIconBrightness: Brightness.light,
+          statusBarIconBrightness: Brightness.light,  // يمكن أن تظل هذه كما هي إذا كنت تستخدم لونًا فاتحًا للأيقونات
+          systemNavigationBarIconBrightness: Brightness.light, // نفس الشيء هنا
+          statusBarColor: AppColors.basicColor, // تحديد اللون الأساسي لشريط الحالة
+          systemNavigationBarColor: AppColors.basicColor, // تحديد اللون الأساسي لشريط التنقل
+
 
         ), child: Material(
-        color:  Colors.white,
+        color:  AppColors.basicColor,
         child: Container(
             decoration: BoxDecoration(
             ),
@@ -340,271 +343,116 @@ class _OrderHistoryState extends State<OrderHistory> {
             ),
           ),
           Container(
-            height: controller.keyboardVisibility.value? Get.height/3.5 :Get.height/2,
+            height: controller.keyboardVisibility.value ? Get.height / 3.5 : Get.height / 2,
             child: TabBarView(
               physics: const NeverScrollableScrollPhysics(),
-              controller: controller.tapController, children:
-            [
-              controller.changeIndexState.value? loadingPage():  Container(height: Get.height*0.7,width: Get.width,margin: const EdgeInsets.only(top:0,left: 20,right: 20),child:
-              controller.orderHistory.isEmpty ? ALConstantsWidget.NotFoundData(TranslationKeys.notFoundData.tr):
-              SmartRefresher(
-                  primary: true,
-                  enablePullDown:true,
-                  enablePullUp: true ,
-                  header: WaterDropHeader(waterDropColor: AppColors.secondaryColor,refresh: ALConstantsWidget.loading(width:Get.width*0.1,height: Get.width*0.1,color: AppColors.basicColor), complete:ALConstantsWidget.smartRefresh() ),
-                  footer: CustomFooter(
-                    builder: (BuildContext context,LoadStatus? mode){
-                      Widget body ;
-                      if(mode==LoadStatus.idle){
-                        body =   Text(TranslationKeys.moreProduct.tr);
-                      }
-                      else if(mode==LoadStatus.loading){
-                        body = Platform.isAndroid? const CircularProgressIndicator(color: Colors.white,strokeWidth: 1,backgroundColor: AppColors.secondaryColor,) :  CupertinoActivityIndicator(color: Theme.of(Get.context!).primaryColorDark);
-                      }
-                      else if(mode == LoadStatus.failed){
-                        body = const Text('');
-                      }
-                      else if(mode == LoadStatus.canLoading){
-                        body =  Text(TranslationKeys.moreProduct.tr);
-                      }
-                      else{
-                        body =  Text(TranslationKeys.noMore.tr);
-                      }
-                      return DefaultTextStyle(
-                        style: const TextStyle(fontSize: 14, color:Colors.white),
-                        child: Padding(padding:  EdgeInsets.only(left:  Get.width*0.27,right:  Get.width*0.27,) ,child:SizedBox(
-                          height: mode==LoadStatus.loading ? 55 :Get.height*0.04,
-                          child: Stack(
-                            alignment: Alignment.topCenter,
-                            children: [
-                              Container(
-                                height: mode==LoadStatus.loading ? 55 :Get.height*0.045,
-                                decoration: BoxDecoration(
-                                    color: mode==LoadStatus.loading ? Colors.transparent :AppColors.secondaryColor,
-                                    borderRadius: BorderRadius.circular(18)),
-                                child: Center(child:body),
-                              ),
-                            ],
-                          ),
-                        )),
-                      );
-                    },
-                  ),
-                  controller: controller.refreshController,
-                  onRefresh: controller.getListOfRefresh,
-                  onLoading: controller.getListOfLoading,
-                  child:GetBuilder<OrderHistoryControllers>(init:controller,builder: (set)=>AnimationLimiter(
+              controller: controller.tapController,
+              children: [
+                // التبويب الأول (Pending)
+                controller.changeIndexState.value
+                    ? loadingPage()
+                    : Container(
+                  height: Get.height * 0.7,
+                  width: Get.width,
+                  margin: const EdgeInsets.only(top: 0, left: 20, right: 20),
+                  child: controller.orderHistory.isEmpty
+                      ? ALConstantsWidget.NotFoundData(TranslationKeys.notFoundData.tr)
+                      : SmartRefresher(
+                    controller: controller.refreshControllerPending,
+                    onRefresh: () => controller.getListOfRefresh(0),
+                    onLoading: () => controller.getListOfLoading(0),
+                    enablePullDown: true,
+                    enablePullUp: true,
                     child: ListView.builder(
-                        physics: NeverScrollableScrollPhysics(),
-                        padding: EdgeInsets.only(bottom: Get.height*0.01),
-                        shrinkWrap: true,
-                        primary: false,
-                        itemCount: controller.orderHistory.length,
-                        itemBuilder: (context,index){
-                          OrderModel item =controller.orderHistory[index];
-                          return AnimationConfiguration.staggeredGrid(
-                              position: index,
-                              duration: const Duration(milliseconds: 500),
-                              columnCount: 2,
-                              child: ScaleAnimation(
-                                  duration: const Duration(milliseconds: 900),
-                                  curve: Curves.fastLinearToSlowEaseIn,
-                                  child: FadeInAnimation(
-                                    child:  Container(
-                                      margin: const EdgeInsets.only(top: 10),
-                                      child: ALOrderHistory(
-                                        key: UniqueKey(),
-                                        onTap: () {
-                                          if (item != null && item.num != null) {
-                                            Get.toNamed(
-                                              Routes.OrderDetails,
-                                              arguments: {'order': item, 'title': controller.title.tr},
-                                            );
-                                          } else {
-                                            Get.snackbar('خطأ', 'تعذر تحميل تفاصيل الطلب، الطلب غير متوفر');
-                                          }
-                                        },
-
-                                        orderHistoryM: item,
-                                      ),
-                                    ),)));
-                        }),)))),
-
-              controller.changeIndexState.value? loadingPage():  Container(height: Get.height*0.7,width: Get.width,margin: const EdgeInsets.only(top:0,left: 20,right: 20),child:
-              controller.orderHistory.isEmpty ? ALConstantsWidget.NotFoundData(TranslationKeys.notFoundData.tr):
-              SmartRefresher(
-                  primary: true,
-
-                  enablePullDown:true,
-                  enablePullUp: true ,
-                  header: WaterDropHeader(waterDropColor: AppColors.secondaryColor,refresh: ALConstantsWidget.loading(width:Get.width*0.1,height: Get.width*0.1,color: AppColors.basicColor), complete:ALConstantsWidget.smartRefresh() ),
-                  footer: CustomFooter(
-                    builder: (BuildContext context,LoadStatus? mode){
-                      Widget body ;
-                      if(mode==LoadStatus.idle){
-                        body =   Text(TranslationKeys.moreProduct.tr);
-                      }
-                      else if(mode==LoadStatus.loading){
-                        body = Platform.isAndroid? const CircularProgressIndicator(color: Colors.white,strokeWidth: 1,backgroundColor: AppColors.secondaryColor,) :  CupertinoActivityIndicator(color: Theme.of(Get.context!).primaryColorDark);
-                      }
-                      else if(mode == LoadStatus.failed){
-                        body = const Text('');
-                      }
-                      else if(mode == LoadStatus.canLoading){
-                        body =  Text(TranslationKeys.moreProduct.tr);
-                      }
-                      else{
-                        body =  Text(TranslationKeys.noMore.tr);
-                      }
-                      return DefaultTextStyle(
-                        style: const TextStyle(fontSize: 14, color:Colors.white),
-                        child: Padding(padding:  EdgeInsets.only(left:  Get.width*0.27,right:  Get.width*0.27,) ,child:SizedBox(
-                          height: mode==LoadStatus.loading ? 55 :Get.height*0.04,
-                          child: Stack(
-                            alignment: Alignment.topCenter,
-                            children: [
-                              Container(
-                                height: mode==LoadStatus.loading ? 55 :Get.height*0.045,
-                                decoration: BoxDecoration(
-                                    color: mode==LoadStatus.loading ? Colors.transparent :AppColors.secondaryColor,
-                                    borderRadius: BorderRadius.circular(18)),
-                                child: Center(child:body),
-                              ),
-                            ],
+                      shrinkWrap: true,
+                      itemCount: controller.orderHistory.length,
+                      itemBuilder: (context, index) {
+                        OrderModel item = controller.orderHistory[index];
+                        return Container(
+                          margin: const EdgeInsets.only(top: 10),
+                          child: ALOrderHistory(
+                            key: UniqueKey(),
+                            onTap: () {
+                              Get.toNamed(Routes.OrderDetails, arguments: {'order': item, 'title': controller.title.tr});
+                            },
+                            orderHistoryM: item,
                           ),
-                        )),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                  controller: controller.refreshController,
-                  onRefresh: controller.getListOfRefresh,
-                  onLoading: controller.getListOfLoading,
-                  child:GetBuilder<OrderHistoryControllers>(init:controller,builder: (set)=>AnimationLimiter(
+                ),
+
+                // التبويب الثاني (Processing)
+                controller.changeIndexState.value
+                    ? loadingPage()
+                    : Container(
+                  height: Get.height * 0.7,
+                  width: Get.width,
+                  margin: const EdgeInsets.only(top: 0, left: 20, right: 20),
+                  child: controller.orderHistory.isEmpty
+                      ? ALConstantsWidget.NotFoundData(TranslationKeys.notFoundData.tr)
+                      : SmartRefresher(
+                    controller: controller.refreshControllerProcessing, // استخدم refreshControllerProcessing
+                    onRefresh: () => controller.getListOfRefresh(1), // تمرير 1 للـ tab الثاني
+                    onLoading: () => controller.getListOfLoading(1),
+                    enablePullDown: true,
+                    enablePullUp: true,
                     child: ListView.builder(
-                        physics: NeverScrollableScrollPhysics(),
-                        padding: EdgeInsets.only(bottom: Get.height*0.01),
-                        shrinkWrap: true,
-                        primary: false,
-                        itemCount: controller.orderHistory.length,
-                        itemBuilder: (context,index){
-                          OrderModel item =controller.orderHistory[index];
-                          return AnimationConfiguration.staggeredGrid(
-                              position: index,
-                              duration: const Duration(milliseconds: 500),
-                              columnCount: 2,
-                              child: ScaleAnimation(
-                                  duration: const Duration(milliseconds: 900),
-                                  curve: Curves.fastLinearToSlowEaseIn,
-                                  child: FadeInAnimation(
-                                    child:  Container(
-                                      margin: const EdgeInsets.only(top: 10),
-                                      child: ALOrderHistory(
-                                        key: UniqueKey(),
-                                        onTap: () {
-                                          if (item != null && item.num != null) {
-                                            Get.toNamed(
-                                              Routes.OrderDetails,
-                                              arguments: {'order': item, 'title': controller.title.tr},
-                                            );
-                                          } else {
-                                            Get.snackbar('خطأ', 'تعذر تحميل تفاصيل الطلب، الطلب غير متوفر');
-                                          }
-                                        },
-
-                                        orderHistoryM: item,
-                                      ),
-                                    ),)));
-                        }),)))),
-
-              controller.changeIndexState.value? loadingPage():  Container(height: Get.height*0.7,width: Get.width,margin: const EdgeInsets.only(top:0,left: 20,right: 20),child:
-              controller.orderHistory.isEmpty ? ALConstantsWidget.NotFoundData(TranslationKeys.notFoundData.tr):
-              SmartRefresher(
-                  primary: true,
-
-                  enablePullDown:true,
-                  enablePullUp: true ,
-                  header: WaterDropHeader(waterDropColor: AppColors.secondaryColor,refresh: ALConstantsWidget.loading(width:Get.width*0.1,height: Get.width*0.1,color: AppColors.basicColor), complete:ALConstantsWidget.smartRefresh() ),
-                  footer: CustomFooter(
-                    builder: (BuildContext context,LoadStatus? mode){
-                      Widget body ;
-                      if(mode==LoadStatus.idle){
-                        body =   Text(TranslationKeys.moreProduct.tr);
-                      }
-                      else if(mode==LoadStatus.loading){
-                        body = Platform.isAndroid? const CircularProgressIndicator(color: Colors.white,strokeWidth: 1,backgroundColor: AppColors.secondaryColor,) :  CupertinoActivityIndicator(color: Theme.of(Get.context!).primaryColorDark);
-                      }
-                      else if(mode == LoadStatus.failed){
-                        body = const Text('');
-                      }
-                      else if(mode == LoadStatus.canLoading){
-                        body =  Text(TranslationKeys.moreProduct.tr);
-                      }
-                      else{
-                        body =  Text(TranslationKeys.noMore.tr);
-                      }
-                      return DefaultTextStyle(
-                        style: const TextStyle(fontSize: 14, color:Colors.white),
-                        child: Padding(padding:  EdgeInsets.only(left:  Get.width*0.27,right:  Get.width*0.27,) ,child:SizedBox(
-                          height: mode==LoadStatus.loading ? 55 :Get.height*0.04,
-                          child: Stack(
-                            alignment: Alignment.topCenter,
-                            children: [
-                              Container(
-                                height: mode==LoadStatus.loading ? 55 :Get.height*0.045,
-                                decoration: BoxDecoration(
-                                    color: mode==LoadStatus.loading ? Colors.transparent :AppColors.secondaryColor,
-                                    borderRadius: BorderRadius.circular(18)),
-                                child: Center(child:body),
-                              ),
-                            ],
+                      shrinkWrap: true,
+                      itemCount: controller.orderHistory.length,
+                      itemBuilder: (context, index) {
+                        OrderModel item = controller.orderHistory[index];
+                        return Container(
+                          margin: const EdgeInsets.only(top: 10),
+                          child: ALOrderHistory(
+                            key: UniqueKey(),
+                            onTap: () {
+                              Get.toNamed(Routes.OrderDetails, arguments: {'order': item, 'title': controller.title.tr});
+                            },
+                            orderHistoryM: item,
                           ),
-                        )),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                  controller: controller.refreshController,
-                  onRefresh: controller.getListOfRefresh,
-                  onLoading: controller.getListOfLoading,
-                  child:GetBuilder<OrderHistoryControllers>(init:controller,builder: (set)=>AnimationLimiter(
+                ),
+
+                // التبويب الثالث (Delivered)
+                controller.changeIndexState.value
+                    ? loadingPage()
+                    : Container(
+                  height: Get.height * 0.7,
+                  width: Get.width,
+                  margin: const EdgeInsets.only(top: 0, left: 20, right: 20),
+                  child: controller.orderHistory.isEmpty
+                      ? ALConstantsWidget.NotFoundData(TranslationKeys.notFoundData.tr)
+                      : SmartRefresher(
+                    controller: controller.refreshControllerDelivered, // استخدم refreshControllerDelivered
+                    onRefresh: () => controller.getListOfRefresh(2), // تمرير 2 للـ tab الثالث
+                    onLoading: () => controller.getListOfLoading(2),
+                    enablePullDown: true,
+                    enablePullUp: true,
                     child: ListView.builder(
-                        physics: NeverScrollableScrollPhysics(),
-                        padding: EdgeInsets.only(bottom: Get.height*0.01),
-                        shrinkWrap: true,
-                        primary: false,
-                        itemCount: controller.orderHistory.length,
-                        itemBuilder: (context,index){
-                          OrderModel item =controller.orderHistory[index];
-                          return AnimationConfiguration.staggeredGrid(
-                              position: index,
-                              duration: const Duration(milliseconds: 500),
-                              columnCount: 2,
-                              child: ScaleAnimation(
-                                  duration: const Duration(milliseconds: 900),
-                                  curve: Curves.fastLinearToSlowEaseIn,
-                                  child: FadeInAnimation(
-                                    child:  Container(
-                                      margin: const EdgeInsets.only(top: 10),
-                                      child: ALOrderHistory(
-                                        key: UniqueKey(),
-                                        onTap: () {
-                                          if (item != null && item.num != null) {
-                                            Get.toNamed(
-                                              Routes.OrderDetails,
-                                              arguments: {'order': item, 'title': controller.title.tr},
-                                            );
-                                          } else {
-                                            Get.snackbar('خطأ', 'تعذر تحميل تفاصيل الطلب، الطلب غير متوفر');
-                                          }
-                                        },
-
-                                        orderHistoryM: item,
-                                      ),
-                                    ),)));
-                        }),)))),
-
-
-
-            ],
+                      shrinkWrap: true,
+                      itemCount: controller.orderHistory.length,
+                      itemBuilder: (context, index) {
+                        OrderModel item = controller.orderHistory[index];
+                        return Container(
+                          margin: const EdgeInsets.only(top: 10),
+                          child: ALOrderHistory(
+                            key: UniqueKey(),
+                            onTap: () {
+                              Get.toNamed(Routes.OrderDetails, arguments: {'order': item, 'title': controller.title.tr});
+                            },
+                            orderHistoryM: item,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

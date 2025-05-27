@@ -21,8 +21,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     // ✅ الانتقال للصفحة التالية بعد 2 ثانية
     Future.delayed(Duration(seconds: 2), () {
       if (alSettings.currentUser == null) {
-        FlutterStatusbarcolor.setNavigationBarColor(AppColors.secondaryColor3);
-        FlutterStatusbarcolor.setStatusBarColor(AppColors.secondaryColor3);
+        FlutterStatusbarcolor.setNavigationBarColor(AppColors.secondaryColor);
+        FlutterStatusbarcolor.setStatusBarColor(AppColors.secondaryColor);
       } else {
         FlutterStatusbarcolor.setNavigationBarColor(AppColors.basicColor);
         FlutterStatusbarcolor.setStatusBarColor(AppColors.basicColor);
