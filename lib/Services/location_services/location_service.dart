@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -204,9 +205,17 @@ class LocationController extends GetxController {
 
       );
 
-      Get.snackbar(" نجاح", "تم إرسال الموقع الحالي.");
+      Get.snackbar(" نجاح", "تم إرسال الموقع الحالي.",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,      
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 3));
     } catch (e) {
-      Get.snackbar(" خطأ", "فشل في تحديد الموقع: $e");
+      Get.snackbar(" خطأ", "فشل في تحديد الموقع: $e",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 3));
     } finally {
       isLoading.value = false;
     }

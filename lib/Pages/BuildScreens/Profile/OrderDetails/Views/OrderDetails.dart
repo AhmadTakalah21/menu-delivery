@@ -8,7 +8,7 @@ import 'package:shopping_land_delivery/Pages/BuildScreens/Profile/OrderDetails/C
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../../ALConstants/ALConstantsWidget.dart';
 
 class OrderDetails extends GetView<OrderDetailsControllers> {
@@ -17,43 +17,48 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
     final OrderModel? order = Get.arguments['order'];
 
     if (order == null) {
-      return Scaffold(
+      return const Scaffold(
         body: Center(
-          child: Text('❌ حدث خطأ: لا توجد بيانات للطلب', style: TextStyle(color: Colors.red)),
+          child: Text('❌ حدث خطأ: لا توجد بيانات للطلب',
+              style: TextStyle(color: Colors.red)),
         ),
       );
     }
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
-        statusBarIconBrightness: Brightness.light,  // يمكن أن تظل هذه كما هي إذا كنت تستخدم لونًا فاتحًا للأيقونات
-        systemNavigationBarIconBrightness: Brightness.light, // نفس الشيء هنا
-        statusBarColor: AppColors.basicColor, // تحديد اللون الأساسي لشريط الحالة
-        systemNavigationBarColor: AppColors.basicColor, // تحديد اللون الأساسي لشريط التنقل
-
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarIconBrightness: Brightness.light,
+        statusBarColor: AppColors.basicColor,
+        systemNavigationBarColor: AppColors.basicColor,
       ),
       child: Scaffold(
         backgroundColor: Color(0xFFF5F5F5),
         appBar: AppBar(
-          backgroundColor:AppColors.basicColor,
+          backgroundColor: AppColors.basicColor,
           elevation: 4,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18),
+            icon:
+                const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18),
             onPressed: () {
               Get.back();
             },
           ),
           title: Text(
             'تفاصيل الطلب رقم ${order.num}',
-            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
           ),
           centerTitle: true,
         ),
         body: Obx(() {
           if (controller.pageState.value == 0) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF4A90E2)));
+            return const Center(
+                child: CircularProgressIndicator(color: Color(0xFF4A90E2)));
           } else if (controller.pageState.value == 2) {
-            return Center(child: Text('❌ فشل في تحميل تفاصيل الطلب', style: TextStyle(color: Colors.red)));
+            return const Center(
+                child: Text('❌ فشل في تحميل تفاصيل الطلب',
+                    style: TextStyle(color: Colors.red)));
           } else {
             return Column(
               children: [
@@ -66,75 +71,140 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black12, blurRadius: 5, offset: Offset(0, 3)),
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Colors.black12,
+                                  blurRadius: 5,
+                                  offset: Offset(0, 3)),
                             ],
                           ),
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children: [
+                              // العنوان
                               buildDetailRow(
                                 '📍 العنوان:',
                                 order.address ?? 'غير متوفر',
                                 trailing: IconButton(
-                                  icon: Icon(Icons.location_on, color: Color(0xFF4A90E2)),
+                                  icon: Icon(Icons.location_on_outlined,
+                                      color: Color(0xFF4A90E2), size: 30),
                                   onPressed: () {
-                                    if (order.latitude != null && order.longitude != null) {
+                                    if (order.latitude != null &&
+                                        order.longitude != null) {
                                       Get.to(() => MapScreen(
-                                        latitude: double.tryParse(order.latitude!) ?? 0.0,
-                                        longitude: double.tryParse(order.longitude!) ?? 0.0,
-                                      ));
+                                            latitude: double.tryParse(
+                                                    order.latitude!) ??
+                                                0.0,
+                                            longitude: double.tryParse(
+                                                    order.longitude!) ??
+                                                0.0,
+                                          ));
                                     } else {
-                                      Get.snackbar('خطأ', 'لم يتم التعرف على إحداثيات الموقع');
+                                      Get.snackbar('خطأ',
+                                          'لم يتم التعرف على إحداثيات الموقع',
+                                          backgroundColor: Colors.red,
+                                          colorText: Colors.white,
+                                          snackPosition: SnackPosition.TOP,
+                                          duration: const Duration(seconds: 3));
                                     }
                                   },
                                 ),
                               ),
-                              buildDetailRow('🧑‍💼 اسم العميل:', order.user ?? 'غير متوفر'),
-                              buildDetailRow('📞 رقم الهاتف:', order.userPhone ?? 'غير متوفر'),
-                              buildDetailRow('🚚💸 رسوم التوصيل:', order.delivery_price ?? 'غير متوفر'),
-                              buildDetailRow('💵 إجمالي السعر:', '${order.total} ل.س'),
-                              buildDetailRow('📅 تاريخ الطلب:', order.createdAt ?? 'غير متوفر'),
+
+                              // اسم العميل
+                              buildDetailRow('🧑‍💼 اسم العميل:',
+                                  order.user ?? 'غير متوفر'),
+
+                              // رقم الهاتف
+                              buildDetailRow(
+                                '📞 رقم الهاتف:',
+                                order.userPhone ?? 'غير متوفر',
+                                trailing: IconButton(
+                                  icon: Icon(Icons.phone,
+                                      color: Color(0xFF4A90E2), size: 30),
+                                  onPressed: () async {
+                                    final phoneNumber = order.userPhone ?? '';
+                                    final url = 'tel:$phoneNumber';
+
+                                    if (await canLaunch(url)) {
+                                      await launch(url); // إطلاق الاتصال
+                                    } else {
+                                      Get.snackbar(
+                                          'خطأ', 'لا يمكن إجراء الاتصال',
+                                          backgroundColor: Colors.red,
+                                          colorText: Colors.white,
+                                          snackPosition: SnackPosition.TOP,
+                                          duration: const Duration(seconds: 3));
+                                    }
+                                  },
+                                ),
+                              ),
+
+                              // رسوم التوصيل
+                              buildDetailRow('🚚💸 رسوم التوصيل:',
+                                  order.delivery_price ?? 'غير متوفر'),
+
+                              // إجمالي السعر
+                              buildDetailRow(
+                                  '💵 إجمالي السعر:', '${order.total} ل.س'),
+
+                              // تاريخ الطلب
+                              buildDetailRow('📅 تاريخ الطلب:',
+                                  order.createdAt ?? 'غير متوفر'),
                             ],
                           ),
                         ),
                         const SizedBox(height: 20),
-                        Text(
+                        const Text(
                           '🛒 تفاصيل المنتجات:',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF4A90E2)),
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF4A90E2)),
                         ),
                         const SizedBox(height: 10),
-                        controller.orderDetails.isNotEmpty && controller.orderDetails.first.orders!.isNotEmpty
+                        controller.orderDetails.isNotEmpty &&
+                                controller.orderDetails.first.orders!.isNotEmpty
                             ? ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: controller.orderDetails.first.orders!.length,
-                          itemBuilder: (context, index) {
-                            final item = controller.orderDetails.first.orders![index];
-                            return Card(
-                              margin: const EdgeInsets.symmetric(vertical: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              elevation: 3,
-                              color: Color(0xFFE8F4FA),
-                              child: ListTile(
-                                leading: Icon(Icons.shopping_bag, color: Color(0xFF4A90E2)),
-                                title: Text(item.name ?? 'غير متوفر', style: TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text('🔖 النوع: ${item.type}'),
-                                    Text('💰 السعر: ${item.price} ل.س'),
-                                    Text('🔢 الكمية: ${item.count}'),
-                                    Text('📊 الإجمالي: ${item.total} ل.س'),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                            : Center(child: Text('⚠️ لا توجد تفاصيل لهذا الطلب', style: TextStyle(color: Colors.grey))),
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: controller
+                                    .orderDetails.first.orders!.length,
+                                itemBuilder: (context, index) {
+                                  final item = controller
+                                      .orderDetails.first.orders![index];
+                                  return Card(
+                                    margin:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                    elevation: 3,
+                                    color: Color(0xFFE8F4FA),
+                                    child: ListTile(
+                                      leading: Icon(Icons.shopping_bag,
+                                          color: Color(0xFF4A90E2)),
+                                      title: Text(item.name ?? 'غير متوفر',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.bold)),
+                                      subtitle: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text('🔖 النوع: ${item.type}'),
+                                          Text('💰 السعر: ${item.price} ل.س'),
+                                          Text('🔢 الكمية: ${item.count}'),
+                                          Text(
+                                              '📊 الإجمالي: ${item.total} ل.س'),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : Center(
+                                child: Text('⚠️ لا توجد تفاصيل لهذا الطلب',
+                                    style: TextStyle(color: Colors.grey))),
 
                         const SizedBox(height: 20),
 
@@ -143,20 +213,22 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
                           width: 5,
                         ),
                         ALConstantsWidget.elevatedButtonWithStyle(
-                          text: controller.orderDetails.first.status == 'delivered'
+                          text: controller.orderDetails.first.status ==
+                                  'delivered'
                               ? 'تم التوصيل' // ❌ لا يمكن تغييره
                               : 'قيد التوصيل',
                           colors: AppColors.basicColor,
                           textColor: AppColors.whiteColor,
                           onTap: () {
-                            String? currentStatus = controller.orderDetails.first.status;
+                            String? currentStatus =
+                                controller.orderDetails.first.status;
                             String nextStatus;
 
                             // ✅ منع التغيير إذا كان الطلب في حالة "تم التوصيل"
                             if (currentStatus == 'delivered') {
                               Get.snackbar(
                                 '🚫 إشعار',
-                                '🚚 هذا الطلب تم توصيله بالفعل ولا يمكن تغييره.',
+                                ' هذا الطلب تم توصيله بالفعل ولا يمكن تغييره.',
                                 backgroundColor: Colors.redAccent,
                                 colorText: Colors.white,
                                 snackPosition: SnackPosition.TOP,
@@ -166,11 +238,14 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
 
                             // ✅ تحديد الحالة الجديدة بناءً على الحالة الحالية
                             if (currentStatus == 'processing') {
-                              nextStatus = 'under_delivery'; // 🔄 إذا كان الطلب "قيد المعالجة"، انتقل إلى "قيد التوصيل"
+                              nextStatus =
+                                  'under_delivery'; // 🔄 إذا كان الطلب "قيد المعالجة"، انتقل إلى "قيد التوصيل"
                             } else if (currentStatus == 'under_delivery') {
-                              nextStatus = 'delivered'; // ✅ إذا كان قيد التوصيل، انتقل إلى "تم التوصيل"
+                              nextStatus =
+                                  'delivered'; // ✅ إذا كان قيد التوصيل، انتقل إلى "تم التوصيل"
                             } else {
-                              print("⚠️ الحالة الحالية غير متوقعة: $currentStatus");
+                              print(
+                                  "⚠️ الحالة الحالية غير متوقعة: $currentStatus");
                               Get.snackbar(
                                 '❌ خطأ',
                                 '⚠️ لا يمكن تحديث الطلب، حالة غير متوقعة: $currentStatus',
@@ -189,22 +264,26 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
                             } else if (currentStatus == 'under_delivery') {
                               confirmationMessage = 'هل تم توصيل الطلب بنجاح؟';
                             } else {
-                              confirmationMessage = '⚠️ لا يمكن تغيير حالة الطلب في الوقت الحالي.';
+                              confirmationMessage =
+                                  '⚠️ لا يمكن تغيير حالة الطلب في الوقت الحالي.';
                             }
 
-                          // ✅ عرض Dialog مع الرسالة المعدلة
+                            // ✅ عرض Dialog مع الرسالة المعدلة
 
                             ALConstantsWidget.awesomeDialog(
                               controller: null,
                               child: Text(
                                 confirmationMessage,
-                                style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+                                style: TextStyle(
+                                    fontSize: 21, fontWeight: FontWeight.w800),
                               ),
                               onPressed: () async {
-                                bool success = await controller.UpdateOrder(); // ✅ تحديث الحالة
+                                bool success = await controller
+                                    .UpdateOrder(); // ✅ تحديث الحالة
 
                                 if (success) {
-                                  print("✅ تم تحديث حالة الطلب إلى: $nextStatus");
+                                  print(
+                                      "✅ تم تحديث حالة الطلب إلى: $nextStatus");
                                 } else {
                                   print("❌ فشل في تحديث حالة الطلب");
                                 }
@@ -213,15 +292,8 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
                               btnOkText: 'نعم',
                               btnCancelText: 'لا',
                             );
-
                           },
                         ),
-
-
-
-
-
-
                       ],
                     ),
                   ),
@@ -238,7 +310,7 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,  // محاذاة النص من اليسار
+        mainAxisAlignment: MainAxisAlignment.start, // محاذاة النص من اليسار
         children: [
           Text(
             title,
@@ -248,7 +320,7 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
               color: Color(0xFF4A90E2),
             ),
           ),
-          const SizedBox(width: 8),  // إضافة مسافة بين العنوان والقيمة
+          const SizedBox(width: 8), // إضافة مسافة بين العنوان والقيمة
           Expanded(
             child: Text(
               value,
@@ -257,26 +329,27 @@ class OrderDetails extends GetView<OrderDetailsControllers> {
                 fontWeight: FontWeight.w400,
                 color: Colors.black87,
               ),
-              overflow: TextOverflow.ellipsis,  // تقطيع النص في حال كان طويلًا
-              maxLines: 2,  // يسمح بعرض النص في سطرين
+              overflow: TextOverflow.ellipsis, // تقطيع النص في حال كان طويلًا
+              maxLines: 2, // يسمح بعرض النص في سطرين
             ),
           ),
-          if (trailing != null) trailing,  // إذا كان هناك trailing يتم إضافته
+          if (trailing != null) trailing, // إذا كان هناك trailing يتم إضافته
         ],
       ),
     );
   }
-
 }
 
 class MapScreen extends StatelessWidget {
   final double latitude;
   final double longitude;
 
-  const MapScreen({Key? key, required this.latitude, required this.longitude}) : super(key: key);
+  const MapScreen({Key? key, required this.latitude, required this.longitude})
+      : super(key: key);
 
   Future<Position> _getCurrentLocation() async {
-    return await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high);
   }
 
   @override
@@ -290,7 +363,8 @@ class MapScreen extends StatelessWidget {
         future: _getCurrentLocation(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator(color: Color(0xFF4A90E2)));
+            return const Center(
+                child: CircularProgressIndicator(color: Color(0xFF4A90E2)));
           } else if (snapshot.hasError) {
             return Center(child: Text('تعذر الحصول على الموقع الحالي'));
           } else {
@@ -300,8 +374,11 @@ class MapScreen extends StatelessWidget {
               margin: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 4)),
+                boxShadow: const [
+                  BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 4)),
                 ],
               ),
               child: ClipRRect(
@@ -313,7 +390,8 @@ class MapScreen extends StatelessWidget {
                   ),
                   children: [
                     TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     ),
                     MarkerLayer(
                       markers: [
@@ -321,13 +399,16 @@ class MapScreen extends StatelessWidget {
                           point: LatLng(latitude, longitude),
                           width: 80,
                           height: 80,
-                          child: Icon(Icons.location_on, color: Colors.red, size: 40),
+                          child: const Icon(Icons.location_on,
+                              color: Colors.red, size: 40),
                         ),
                         Marker(
-                          point: LatLng(currentPosition.latitude, currentPosition.longitude),
+                          point: LatLng(currentPosition.latitude,
+                              currentPosition.longitude),
                           width: 80,
                           height: 80,
-                          child: Icon(Icons.person_pin_circle, color: Colors.blue, size: 40),
+                          child: const Icon(Icons.person_pin_circle,
+                              color: Colors.blue, size: 40),
                         ),
                       ],
                     ),
@@ -341,12 +422,6 @@ class MapScreen extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
 
 //// ✅ زر تغيير حالة الطلب
 //                 Container(
